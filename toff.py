@@ -31,5 +31,3 @@ def close_ham(p, y, x):
         return hams
 
 
-def norme1(x1, y1, x2, y2):
-    return abs(x2-x1) + abs(y2-y1)
