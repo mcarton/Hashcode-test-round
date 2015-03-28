@@ -45,42 +45,52 @@ class Rect:
         return (self.p2.x - self.p1.x + 1) * (self.p2.y - self.p1.y + 1)
 
 
-def solutions_row_rec(p, i, slices, slices_row):
-    for j1 in range(p.cols):
-        if p.problem[i][j1] != 'H':
-            continue
+def solutions_row_dynprog(problem, i):
+    values = [0 for _ in range(problem.cols)]
+    parent = [None for _ in range(problem.cols)]
 
-        c = 0
-        j2 = j1
+    for j2 in range(problem.cols):
+        j1 = j2
 
-        while c <= p.h and j2 < p.cols and j2 - j1 + 1 <= p.s:
-            if any(s.is_in(j2) for s in slices):
-                break
+        while j1 >= 0 and j2 - j1 + 1 <= problem.s:
+            hams = sum(1 if problem.problem[i][j] == 'H' else 0 for j in range(j1, j2 + 1))
+            if hams >= problem.h:
+                if j1 == 0:
+                    v = j2 - j1 + 1
+                    p = Slice(j1, j2), -1
 
-            if p.problem[i][j2] == 'H':
-                c += 1
+                    if v >= values[j2]:
+                        values[j2] = v
+                        parent[j2] = p
+                else:
+                    v = 0
+                    p = None
 
-                if c == p.h:
-                    new_slices = copy.deepcopy(slices)
-                    new_slices.append(Slice(j1, j2))
+                    for j in range(j1):
+                        if values[j] + (j2 - j1 + 1) >= v:
+                            v = values[j] + (j2 - j1 + 1)
+                            p = Slice(j1, j2), j
 
-                    if slices_row[i] is None:
-                        slices_row[i] = new_slices
-                    else:
-                        if sum(s.size() for s in new_slices) > sum(s.size() for s in slices_row[i]):
-                            slices_row[i] = new_slices
+                    if v > values[j2]:
+                        values[j2] = v
+                        parent[j2] = p
 
-                    solutions_row_rec(p, i, new_slices, slices_row)
+            j1 -= 1
 
-            j2 += 1
+    slices = []
+    j = values.index(max(values))
+    while j >= 0 and parent[j] is not None:
+        slices.append(parent[j][0])
+        j = parent[j][1]
+
+    return slices
 
 
 def solution(p):
     slices_row = [None for _ in range(p.rows)]
 
     for i in range(p.rows):
-        solutions_row_rec(p, i, [], slices_row)
-        print('row %i slices %s' % (i, slices_row[i]))
+        slices_row[i] = solutions_row_dynprog(p, i)
 
     nb = 0
     result = ''
@@ -89,7 +99,7 @@ def solution(p):
         if slices is not None:
             for s in slices:
                 nb += 1
-                result += '%d %d %d %d\n' % (i, s.j1, i, s.j1)
+                result += '%d %d %d %d\n' % (i, s.j1, i, s.j2)
 
     with open('out', 'w') as f:
         f.write('%d\n' % nb)
