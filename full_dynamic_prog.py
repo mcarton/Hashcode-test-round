@@ -84,7 +84,7 @@ def solution(problem):
                             start_prev_j = j1
 
                         for prev_j in range(start_prev_j, -1, -1):
-                            prev_l = max(1, l - (i - prev_i))
+                            prev_l = max(1, max(l, h) - (i - prev_i))
                             best_score = max(best_score, w * h + scores[prev_i][prev_j][prev_l])
 
                 scores[i][j][l] = best_score
