@@ -68,11 +68,13 @@ def solution(problem):
 
             for l in range(1, min(problem.s, i + 1) + 1):
                 # on va calculer scores[i][j][l]
+                best_score = 0
+
                 for w, h in slices:
                     i0, i1 = i - h + 1, i
                     j0, j1 = j - w + 1, j
 
-                    best_score = 0
+                    best_score = max(best_score, w * h)
                     # pour chaque position de la part précédente
                     for prev_i in range(i, -1, -1): # [i, i-1, …, 0]
                         start_prev_j = problem.cols - 1 # all cols
@@ -83,9 +85,10 @@ def solution(problem):
 
                         for prev_j in range(start_prev_j, -1, -1):
                             prev_l = max(1, l - (i - prev_i))
-                            best_score = max(best_score, scores[prev_i][prev_j][prev_l])
+                            best_score = max(best_score, w * h + scores[prev_i][prev_j][prev_l])
 
-                    scores[i][j][l] = max(scores[i][j][l], w * h + best_score)
+                scores[i][j][l] = best_score
+                assert(scores[i][j][l] <= problem.cols * (i - l + 1) + l * (j + 1))
 
             print('(%d, %d) max score %d' % (i, j, max(scores[i][j])))
 
