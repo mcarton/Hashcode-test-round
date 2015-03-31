@@ -31,7 +31,7 @@ struct Slice {
     int j1;
 
     Slice(int i0, int i1, int j0, int j1): i0(i0), i1(i1), j0(j0), j1(j1) {
-        assert(i0 <= i1 && j0 <= j1 && "bad slice");
+        assert(0 <= i0 && i0 <= i1 && 0 <= j0 && j0 <= j1 && "bad slice");
     }
 
     int size() const {
@@ -48,6 +48,19 @@ struct Slice {
 
     bool is_in(int i, int j) const {
         return i0 <= i && i <= i1 && j0 <= j && j <= j1;
+    }
+
+    bool collide_with(const Slice& s) const {
+        for(int i = s.i0; i <= s.i1; ++i) {
+            for(int j = s.j0; j <= s.j1; ++j) {
+                // for all (i, j) in s
+                if(i0 <= i && i <= i1 && j0 <= j && j <= j1) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 };
 
@@ -134,6 +147,44 @@ int count_ham(const Problem& problem, const Slice& slice) {
     return ham;
 }
 
+// returne true si le slice peut être contenu dans la repartition
+bool slice_fit(const std::vector<Slice>& repartition, const Slice& slice) {
+    for(const auto& s : repartition) {
+        if(s.collide_with(slice)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// fusionne repartition avec slice, en oubliant tout ce qui est strictement avant (i, j)
+// retourne les slices dans l'ordre
+// warning: i peut être < 0, dans ce cas on garde tout
+std::vector<Slice> slice_merge(const std::vector<Slice>& repartition, const Slice& inserted_slice, int i, int j) {
+    bool inserted = false;
+    std::vector<Slice> result;
+    result.reserve(repartition.size() + 1);
+
+    for(const auto& s : repartition) {
+        if(s.i1 < i || (s.i1 == i && s.j1 < j))
+            continue;
+
+        if(!inserted && (inserted_slice.i0 < s.i0 || (inserted_slice.i0 == s.i0 && inserted_slice.j0 < s.j0))) {
+            result.push_back(inserted_slice);
+            inserted = true;
+        }
+
+        result.emplace_back(std::max(i, s.i0), s.i1, s.j0, s.j1);
+    }
+
+    if(!inserted) {
+        result.push_back(inserted_slice);
+    }
+
+    return result;
+}
+
 void solution_dp(const Problem& problem) {
     /* scores[i][j] = meilleur score possible en ayant une part finissant en
      *                (i, j) en en utilisant uniquement (y, x) avec
@@ -177,45 +228,52 @@ void solution_dp(const Problem& problem) {
             // pour chaque part finissant en (i, j)
             for(const auto& slice : slices) {
                 // on calcul scores_possibilities[i][j]
-                
+
                 // première possibilité : slice tout seul dans la zone de possibilité
-                std::vector<Slice> merge = {slice};
-                int best_score = slice.size();
+                {
+                    std::vector<Slice> merge = {slice};
+                    int best_score = slice.size();
 
-                for(int prev_i = 0; prev_i <= i - problem.s + 1; ++prev_i) {
-                    int end_prev_j = (prev_i == i - problem.s + 1) ? j - 1 : problem.cols - 1;
+                    for(int prev_i = 0; prev_i <= i - problem.s + 1; ++prev_i) {
+                        int end_prev_j = (prev_i == i - problem.s + 1) ? j - 1 : problem.cols - 1;
 
-                    for(int prev_j = 0; prev_j <= end_prev_j; ++prev_j) {
-                        best_score = std::max(best_score, slice.size() + scores[prev_i][prev_j]);
+                        for(int prev_j = 0; prev_j <= end_prev_j; ++prev_j) {
+                            best_score = std::max(best_score, slice.size() + scores[prev_i][prev_j]);
+                        }
                     }
-                }
 
-                scores_possibilities[i][j][merge] = best_score;
+                    scores_possibilities[i][j][merge] = best_score;
+                }
 
                 // pour chaque possibilité dans la zone de possibilité
                 for(int prev_i = std::max(0, i - problem.s + 1); prev_i <= i; ++prev_i) {
-                    int begin_prev_j = 0;
-                    int end_prev_j = problem.cols - 1;
-
-                    if(prev_i == i - problem.s + 1)
-                        begin_prev_j = j;
-
-                    if(prev_i == i)
-                        end_prev_j = j - 1;
+                    const int begin_prev_j = (prev_i == i - problem.s + 1) ? j : 0;
+                    const int end_prev_j = (prev_i == i) ? j - 1 : problem.cols - 1;
 
                     for(int prev_j = begin_prev_j; prev_j <= end_prev_j; ++prev_j) {
                         if(!slice.is_in(prev_i, prev_j)) {
                             // pour chaque fin de part précédente dans la zone de possibilité
                             for(const auto& item : scores_possibilities[prev_i][prev_j]) {
                                 // pour chaque découpage
-                                // TODO
+                                const std::vector<Slice>& repartition = item.first;
+
+                                if(slice_fit(repartition, slice)) {
+                                    std::vector<Slice> merge = slice_merge(repartition, slice, i - problem.s + 1, j);
+
+                                    if(scores_possibilities[i][j].find(merge) == scores_possibilities[i][j].end()) {
+                                        scores_possibilities[i][j][merge] = item.second + slice.size();
+                                    }
+                                    else {
+                                        scores_possibilities[i][j][merge] = std::max(scores_possibilities[i][j][merge], item.second + slice.size());
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
 
-            std::cerr << "(" << i << ", " << j << ")" << std::endl;
+            std::cerr << "(" << i << ", " << j << ") − " << scores_possibilities[i][j].size() << " possibilities" << std::endl;
         }
     }
 }
