@@ -56,7 +56,7 @@ struct Slice {
     }
 };
 
-std::ostream& operator<<(std::ostream& o, const std::vector<Slice> slices) {
+std::ostream& operator<<(std::ostream& o, const std::vector<Slice>& slices) {
     o << slices.size() << std::endl;
 
     for(const auto& slice : slices) {
