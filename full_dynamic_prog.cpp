@@ -273,6 +273,7 @@ std::vector<Slice> solution_dp(const Problem& problem) {
 
                 std::cerr << "ajout de " << slices[index] << std::endl;
                 result.push_back(slices[index]);
+                best_score += slices[index].size();
             }
         }
     }
@@ -284,6 +285,7 @@ std::vector<Slice> solution_dp(const Problem& problem) {
                 && slice_fit(result, Slice(slice.i0 - 1, slice.i0 - 1, slice.j0, slice.j1))) {
             std::cerr << "augmentation vers le haut de " << slice << std::endl;
             slice.i0--;
+            best_score += slice.w();
         }
 
         while(slice.i1 < problem.rows - 1
@@ -291,6 +293,7 @@ std::vector<Slice> solution_dp(const Problem& problem) {
                 && slice_fit(result, Slice(slice.i1 + 1, slice.i1 + 1, slice.j0, slice.j1))) {
             std::cerr << "augmentation vers le bas de " << slice << std::endl;
             slice.i1++;
+            best_score += slice.w();
         }
 
         while(slice.j0 > 0
@@ -298,6 +301,7 @@ std::vector<Slice> solution_dp(const Problem& problem) {
                 && slice_fit(result, Slice(slice.i0, slice.i1, slice.j0 - 1, slice.j0 - 1))) {
             std::cerr << "augmentation vers la gauche de " << slice << std::endl;
             slice.j0--;
+            best_score += slice.h();
         }
 
         while(slice.j1 < problem.cols - 1
@@ -305,9 +309,11 @@ std::vector<Slice> solution_dp(const Problem& problem) {
                 && slice_fit(result, Slice(slice.i0, slice.i1, slice.j1 + 1, slice.j1 + 1))) {
             std::cerr << "augmentation vers la droite " << slice << std::endl;
             slice.j1++;
+            best_score += slice.h();
         }
     }
 
+    std::cerr << "best score " << best_score << std::endl;
     return result;
 }
 
