@@ -112,22 +112,18 @@ int count_ham(const Problem& problem, const Slice& slice) {
 }
 
 void solution_dp(const Problem& problem) {
-    /* scores[i][j] = meilleur score possible en ayant une part finissant en
-     *                (i, j) en en utilisant uniquement les (y, x) avec
-     *                0 <= y <= i et 0 <= x <= j
-     */
-    boost::multi_array<int, 2> scores(extents[problem.rows][problem.cols]);
-
-    /* scores_possibilities[i][j] est une unordered_map avec pour clé
-     * un vecteur d'entier v de taille maximum problem.s - 1, représentant un
-     * partitionnement, et en valeur le meilleur score possible pour ce
-     * partitionnement.
+    /* scores est une unordered_map avec pour clé un vecteur d'entier v de
+     * taille problem.cols représentant un partitionnement, et en valeur le
+     * meilleur score possible pour ce partitionnement.
      *
-     * Pour un vecteur v représentant un partitionnement, v[di] est l'indice de
-     * la première colonne disponible dans la ligne i - 1 - di.
+     * Pour un vecteur v représentant un partitionnement, v[j] est l'indice de
+     * la première ligne disponible pour la colonne j
      */
-    typedef std::unordered_map<std::vector<int>, int, container_hash<std::vector<int>>> scores_t;
-    boost::multi_array<scores_t, 2> scores_possibilities(extents[problem.rows][problem.cols]);
+    std::unordered_map<std::vector<int>, int, container_hash<std::vector<int>>> scores;
+
+    // init
+    std::vector<int> position(problem.cols, 0);
+    scores[position] = 0;
 
     // ensemble des couples (w, h) des parts possibles
     std::vector<std::pair<int, int>> all_slices;
@@ -157,9 +153,56 @@ void solution_dp(const Problem& problem) {
 
             // pour chaque part finissant en (i, j)
             for(const auto& slice : slices) {
+                // première possibilité : slice tout seul dans la zone de possibilité
+                for(int p = 0; p < problem.cols; ++p) {
+                    if(slice.j0 <= p && p <= slice.j1) {
+                        position[p] = std::min(slice.i1 + 1, problem.rows);
+                    }
+                    else {
+                        position[p] = std::max(i - problem.s + 1, 0);
+                    }
+                }
+
+                if(scores.find(position) == scores.end()) {
+                    scores[position] = slice.size();
+                }
+                else {
+                    scores[position] = std::max(scores[position], slice.size());
+                }
+
+                // les autres possibilités
+                for(const auto& item : scores) {
+                    const std::vector<int>& last_position = item.first;
+
+                    // peut-on insérer slice dans la position ?
+                    bool valid = true;
+                    for(int p = slice.j0; valid && p <= slice.j1; ++p) {
+                        if(slice.i0 < last_position[p]) {
+                            valid = false;
+                        }
+                    }
+
+                    if(valid) {
+                        for(int p = 0; p < problem.cols; ++p) {
+                            if(slice.j0 <= p && p <= slice.j1) {
+                                position[p] = std::min(slice.i1 + 1, problem.rows);
+                            }
+                            else {
+                                position[p] = last_position[p];
+                            }
+                        }
+
+                        if(scores.find(position) == scores.end()) {
+                            scores[position] = item.second + slice.size();
+                        }
+                        else {
+                            scores[position] = std::max(scores[position], item.second + slice.size());
+                        }
+                    }
+                }
             }
-            
-            std::cerr << "(" << i << ", " << j << ")" << std::endl;
+
+            std::cerr << "(" << i << ", " << j << ") - " << scores.size() << " possibilities" << std::endl;
         }
     }
 }
