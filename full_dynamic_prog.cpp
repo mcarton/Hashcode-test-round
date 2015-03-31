@@ -54,7 +54,29 @@ struct Slice {
     int h() const {
         return i1 - i0 + 1;
     }
+
+    bool is_in(int i, int j) const {
+        return i0 <= i && i <= i1 && j0 <= j && j <= j1;
+    }
+
+    bool collide_with(const Slice& s) const {
+        for(int i = s.i0; i <= s.i1; ++i) {
+            for(int j = s.j0; j <= s.j1; ++j) {
+                // for all (i, j) in s
+                if(i0 <= i && i <= i1 && j0 <= j && j <= j1) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 };
+
+std::ostream& operator<<(std::ostream& o, const Slice& s) {
+    o << "Slice(" << s.i0 << ", " << s.i1 << ", " << s.j0 << ", " << s.j1 << ")";
+    return o;
+}
 
 std::ostream& operator<<(std::ostream& o, const std::vector<Slice>& slices) {
     o << slices.size() << std::endl;
@@ -78,6 +100,17 @@ int count_ham(const Problem& problem, const Slice& slice) {
     }
 
     return ham;
+}
+
+// returne true si le slice peut être contenu dans la repartition
+bool slice_fit(const std::vector<Slice>& slices, const Slice& slice) {
+    for(const auto& s : slices) {
+        if(s.collide_with(slice)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 std::vector<Slice> solution_dp(const Problem& problem) {
@@ -211,6 +244,37 @@ std::vector<Slice> solution_dp(const Problem& problem) {
         }
 
         pos = move.second;
+    }
+
+    // on augmente les slices si possibles
+    for(auto& slice : result) {
+        while(slice.i0 > 0
+                && slice.size() + slice.w() <= problem.s
+                && slice_fit(result, Slice(slice.i0 - 1, slice.i0 - 1, slice.j0, slice.j1))) {
+            std::cerr << "augmentation vers le haut de " << slice << std::endl;
+            slice.i0--;
+        }
+
+        while(slice.i1 < problem.rows - 1
+                && slice.size() + slice.w() <= problem.s
+                && slice_fit(result, Slice(slice.i1 + 1, slice.i1 + 1, slice.j0, slice.j1))) {
+            std::cerr << "augmentation vers le bas de " << slice << std::endl;
+            slice.i1++;
+        }
+
+        while(slice.j0 > 0
+                && slice.size() + slice.h() <= problem.s
+                && slice_fit(result, Slice(slice.i0, slice.i1, slice.j0 - 1, slice.j0 - 1))) {
+            std::cerr << "augmentation vers la gauche de " << slice << std::endl;
+            slice.j0--;
+        }
+
+        while(slice.j1 < problem.cols - 1
+                && slice.size() + slice.h() <= problem.s
+                && slice_fit(result, Slice(slice.i0, slice.i1, slice.j1 + 1, slice.j1 + 1))) {
+            std::cerr << "augmentation vers la droite " << slice << std::endl;
+            slice.j1++;
+        }
     }
 
     return result;
