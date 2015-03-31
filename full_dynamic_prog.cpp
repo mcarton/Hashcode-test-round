@@ -246,6 +246,37 @@ std::vector<Slice> solution_dp(const Problem& problem) {
         pos = move.second;
     }
 
+    // on place la ou on peut encore placer
+    for(int i = 0; i < problem.rows; ++i) {
+        for(int j = 0; j < problem.cols; ++j) {
+            // precalcul des parts possibles terminant en (i, j)
+            std::vector<Slice> slices;
+            slices.reserve(all_slices.size());
+
+            for(const auto& square : all_slices) {
+                if(j - square.first + 1 >= 0 && i - square.second + 1 >= 0) {
+                    Slice slice(i - square.second + 1, i, j - square.first + 1, j);
+                    if(count_ham(problem, slice) >= problem.h && slice_fit(result, slice)) {
+                        slices.push_back(slice);
+                    }
+                }
+            }
+
+            if(slices.size() > 0) {
+                int index = 0;
+
+                for(std::size_t p = 0; p < slices.size(); ++p) {
+                    if(slices[p].size() > slices[index].size()) {
+                        index = p;
+                    }
+                }
+
+                std::cerr << "ajout de " << slices[index] << std::endl;
+                result.push_back(slices[index]);
+            }
+        }
+    }
+
     // on augmente les slices si possibles
     for(auto& slice : result) {
         while(slice.i0 > 0
