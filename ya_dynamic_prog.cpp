@@ -290,7 +290,7 @@ bool slice_fit(const std::vector<Slice>& solution, const Slice& slice) {
     return true;
 }
 
-void optimize_solution(const Problem& problem, std::vector<Slice> solution) {
+void optimize_solution(const Problem& problem, std::vector<Slice>& solution) {
     assert(all_slices.size() > 0);
 
     // on place des slices dans les trous
