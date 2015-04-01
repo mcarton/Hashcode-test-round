@@ -124,6 +124,9 @@ int count_ham(const Problem& problem, const Slice& slice) {
     return ham;
 }
 
+/* mise en cache des ensemble de couple (w, h) des parts possibles */
+std::vector<std::pair<int, int>> all_slices;
+
 std::vector<Slice> partial_dp(const Problem& problem, const Slice& zone) {
     /* scores est une unordered_map avec pour clé un vecteur d'entier v de
      * taille zone.w() représentant un partitionnement, et en valeur le
@@ -140,11 +143,12 @@ std::vector<Slice> partial_dp(const Problem& problem, const Slice& zone) {
     scores[position] = 0;
 
     // ensemble des couples (w, h) des parts possibles
-    std::vector<std::pair<int, int>> all_slices;
-    for(int w = 1; w <= problem.s; ++w) {
-        for(int h = 1; h <= problem.s; ++h) {
-            if(w * h <= problem.s) {
-                all_slices.emplace_back(w, h);
+    if(all_slices.size() == 0) { // pas encore calculé
+        for(int w = 1; w <= problem.s; ++w) {
+            for(int h = 1; h <= problem.s; ++h) {
+                if(w * h <= problem.s) {
+                    all_slices.emplace_back(w, h);
+                }
             }
         }
     }
@@ -195,6 +199,7 @@ std::vector<Slice> partial_dp(const Problem& problem, const Slice& zone) {
                     for(int p = slice.j0 - zone.j0; valid && p <= slice.j1 - zone.j0; ++p) {
                         if(slice.i0 < last_position[p]) {
                             valid = false;
+                            break;
                         }
                     }
 
