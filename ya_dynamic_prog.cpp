@@ -47,11 +47,29 @@ struct Slice {
     int h() const {
         return i1 - i0 + 1;
     }
+
+    bool collide_with(const Slice& s) const {
+        for(int i = s.i0; i <= s.i1; ++i) {
+            for(int j = s.j0; j <= s.j1; ++j) {
+                // for all (i, j) in s
+                if(i0 <= i && i <= i1 && j0 <= j && j <= j1) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 };
 
 /**
  * Fonctions d'affichage
  */
+std::ostream& operator<<(std::ostream& o, const Slice& s) {
+    o << "Slice(" << s.i0 << ", " << s.i1 << ", " << s.j0 << ", " << s.j1 << ")";
+    return o;
+}
+
 template<typename T>
 std::ostream& operator<<(std::ostream& o, const std::vector<T>& v) {
     bool first = true;
@@ -248,6 +266,83 @@ std::vector<Slice> partial_dp(const Problem& problem, const Slice& zone) {
     return result;
 }
 
+// returne true si le slice peut être contenu dans la solution
+bool slice_fit(const std::vector<Slice>& solution, const Slice& slice) {
+    for(const auto& s : solution) {
+        if(s.collide_with(slice)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void optimize_solution(const Problem& problem, std::vector<Slice> solution) {
+    assert(all_slices.size() > 0);
+
+    // on place des slices dans les trous
+    for(int i = 0; i < problem.rows; ++i) {
+        for(int j = 0; j < problem.cols; ++j) {
+            // precalcul des parts possibles terminant en (i, j)
+            std::vector<Slice> slices;
+            slices.reserve(all_slices.size());
+
+            for(const auto& square : all_slices) {
+                if(j - square.first + 1 >= 0 && i - square.second + 1 >= 0) {
+                    Slice slice(i - square.second + 1, i, j - square.first + 1, j);
+                    if(count_ham(problem, slice) >= problem.h && slice_fit(solution, slice)) {
+                        slices.push_back(slice);
+                    }
+                }
+            }
+
+            if(slices.size() > 0) {
+                int index = 0;
+
+                for(std::size_t k = 0; k < slices.size(); ++k) {
+                    if(slices[k].size() > slices[index].size()) {
+                        index = k;
+                    }
+                }
+
+                std::cerr << "ajout de " << slices[index] << std::endl;
+                solution.push_back(slices[index]);
+            }
+        }
+    }
+
+    // on augmente les slices si possibles
+    for(auto& slice : solution) {
+        while(slice.i0 > 0
+                && slice.size() + slice.w() <= problem.s
+                && slice_fit(solution, Slice(slice.i0 - 1, slice.i0 - 1, slice.j0, slice.j1))) {
+            std::cerr << "augmentation vers le haut de " << slice << std::endl;
+            slice.i0--;
+        }
+
+        while(slice.i1 < problem.rows - 1
+                && slice.size() + slice.w() <= problem.s
+                && slice_fit(solution, Slice(slice.i1 + 1, slice.i1 + 1, slice.j0, slice.j1))) {
+            std::cerr << "augmentation vers le bas de " << slice << std::endl;
+            slice.i1++;
+        }
+
+        while(slice.j0 > 0
+                && slice.size() + slice.h() <= problem.s
+                && slice_fit(solution, Slice(slice.i0, slice.i1, slice.j0 - 1, slice.j0 - 1))) {
+            std::cerr << "augmentation vers la gauche de " << slice << std::endl;
+            slice.j0--;
+        }
+
+        while(slice.j1 < problem.cols - 1
+                && slice.size() + slice.h() <= problem.s
+                && slice_fit(solution, Slice(slice.i0, slice.i1, slice.j1 + 1, slice.j1 + 1))) {
+            std::cerr << "augmentation vers la droite " << slice << std::endl;
+            slice.j1++;
+        }
+    }
+}
+
 void solution_dp(const Problem& problem) {
     /*
     const int square_max_size = 20; // square of size 20 * 20 max
@@ -292,6 +387,9 @@ void solution_dp(const Problem& problem) {
             std::cerr << "(" << i << ", " << j << ")" << std::endl;
         }
     }
+
+    // dernière optimisation
+    optimize_solution(problem, result);
 
     int score = 0;
     for(const auto& s : result) {
