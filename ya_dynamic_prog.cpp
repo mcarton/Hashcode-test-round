@@ -367,48 +367,44 @@ int score(const std::vector<Slice>& solution) {
 }
 
 void solution_dp(const Problem& problem) {
-    /* scores[i][j] = meilleur score possible en utilisant les (y, x)
-     *                avec 0 <= y <= i et 0 <= x <= j
-     */
-    boost::multi_array<int, 2> scores(extents[problem.rows][problem.cols]);
+    /* scores[j] = meilleur score possible en utilisant les colonnes [0..j] */
+    std::vector<int> scores(problem.cols, 0);
 
-    const int DP_MAX_WIDTH = 6;
+    const int DP_MAX_WIDTH = 4;
     const int DP_MAX_HEIGHT = 12;
 
-    // programmation dynamique
-    for(int i = 0; i < problem.rows; ++i) {
-        for(int j = 0; j < problem.cols; ++j) {
-            // calcul de scores[i][j]
-            scores[i][j] = 0;
+    // programmation dynamique par colonne
+    for(int j = 0; j < problem.cols; ++j) {
+        scores[j] = 0;
 
-            // on découpe notre espace en deux avec la colonne prev_j
-            for(int prev_j = std::max(0, j - DP_MAX_WIDTH + 1); prev_j <= j; ++prev_j) {
-                // score[i][prev_j - 1] + meilleur score dans [prev_j..j]
-                std::vector<int> scores_bloc(i + 1, 0);
+        // on découpe notre espace en deux avec la colonne prev_j
+        for(int prev_j = std::max(0, j - DP_MAX_WIDTH + 1); prev_j <= j; ++prev_j) {
+            // score = score[prev_j - 1] + meilleur score dans [prev_j..j]
+            // programmation dynamique par ligne
+            std::vector<int> scores_bloc(problem.rows, 0);
 
-                for(int k = 0; k <= i; ++k) {
-                    // calcul de scores_bloc[k]
-                    scores_bloc[k] = 0;
+            for(int k = 0; k < problem.rows; ++k) {
+                // calcul de scores_bloc[k]
+                scores_bloc[k] = 0;
 
-                    for(int prev_k = std::max(0, k - DP_MAX_HEIGHT + 1); prev_k <= k; ++prev_k) {
-                        const std::vector<Slice>& solution = partial_dp(problem, Slice(prev_k, k, prev_j, j));
-                        int s = score(solution);
-                        if(prev_k > 0) {
-                            s += scores_bloc[prev_k - 1];
-                        }
-                        scores_bloc[k] = std::max(scores_bloc[k], s);
+                for(int prev_k = std::max(0, k - DP_MAX_HEIGHT + 1); prev_k <= k; ++prev_k) {
+                    const std::vector<Slice>& solution = partial_dp(problem, Slice(prev_k, k, prev_j, j));
+                    int s = score(solution);
+                    if(prev_k > 0) {
+                        s += scores_bloc[prev_k - 1];
                     }
+                    scores_bloc[k] = std::max(scores_bloc[k], s);
                 }
-
-                int s = scores_bloc[i];
-                if(prev_j > 0) {
-                    s += scores[i][prev_j - 1];
-                }
-                scores[i][j] = std::max(scores[i][j], s);
             }
 
-            std::cerr << "(" << i << ", " << j << ") score " << scores[i][j] << std::endl;
+            int s = scores_bloc[problem.rows - 1];
+            if(prev_j > 0) {
+                s += scores[prev_j - 1];
+            }
+            scores[j] = std::max(scores[j], s);
         }
+
+        std::cerr << "col " << j << " score " << scores[j] << std::endl;
     }
 
     /*
