@@ -114,8 +114,25 @@ bool slice_fit(const std::vector<Slice>& slices, const Slice& slice) {
 }
 
 std::vector<Slice> solution_dp(const Problem& problem) {
+    /* scores[i][j][l] = meilleur score possible en ayant une part finissant en
+     *                  (i, j) et en utilisant la partie de la pizza:
+     *                  ____________________________________________
+     *                  |                                           |
+     *                  |                                           |
+     *                  |                                           |
+     *                  |              _____________________________|
+     *              ↑   |              |                            |
+     *              |   |              |                            |
+     *            l |   |              |                            |
+     *              ↓   |______________| (i, j)                     |
+     */
     boost::multi_array<int, 3> scores(extents[problem.rows][problem.cols][problem.s + 1]);
 
+    /* moves[i][j][l] = (w, h), (prev_i, prev_j, prev_l)
+     *                  pour le meilleur score possible (voir `scores`),
+     *                  w * h est la taille de la part et [prev_i][prev_j][prev_l]
+     *                  la position de la précédente part
+     */
     typedef std::pair<std::pair<int, int>, std::tuple<int, int, int>> move_t;
     const move_t invalid_move = std::make_pair(
                                     std::make_pair(-1, -1), // w, h
