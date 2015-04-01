@@ -196,7 +196,7 @@ std::vector<Slice> partial_dp(const Problem& problem, const Slice& zone) {
 
                     // peut-on insérer slice dans la position ?
                     bool valid = true;
-                    for(int p = slice.j0 - zone.j0; valid && p <= slice.j1 - zone.j0; ++p) {
+                    for(int p = slice.j0 - zone.j0; p <= slice.j1 - zone.j0; ++p) {
                         if(slice.i0 < last_position[p]) {
                             valid = false;
                             break;
@@ -276,8 +276,8 @@ void solution_dp(const Problem& problem) {
     max_size[20] = 6;
     */
 
-    const int HEIGHT = 5;
-    const int WIDTH = 15;
+    const int HEIGHT = 15;
+    const int WIDTH = 6;
 
     std::vector<Slice> result;
     for(int i = 0; i < problem.rows; i += HEIGHT) {
@@ -293,6 +293,12 @@ void solution_dp(const Problem& problem) {
         }
     }
 
+    int score = 0;
+    for(const auto& s : result) {
+        score += s.size();
+    }
+
+    std::cerr << "score " << score << std::endl;
     std::cout << result;
 }
 
