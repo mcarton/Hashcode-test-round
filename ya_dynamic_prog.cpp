@@ -30,6 +30,8 @@ struct Slice {
     int j0;
     int j1;
 
+    Slice() {}
+
     Slice(int i0, int i1, int j0, int j1): i0(i0), i1(i1), j0(j0), j1(j1) {
         assert(0 <= i0 && i0 <= i1 && 0 <= j0 && j0 <= j1 && "bad slice");
     }
@@ -63,6 +65,17 @@ std::ostream& operator<<(std::ostream& o, const std::vector<T>& v) {
     }
 
     o << "]";
+    return o;
+}
+
+template<>
+std::ostream& operator<<(std::ostream& o, const std::vector<Slice>& slices) {
+    o << slices.size() << std::endl;
+
+    for(const auto& slice : slices) {
+        o << slice.i0 << " " << slice.j0 << " " << slice.i1 << " " << slice.j1 << std::endl;
+    }
+
     return o;
 }
 
@@ -111,7 +124,7 @@ int count_ham(const Problem& problem, const Slice& slice) {
     return ham;
 }
 
-void partial_dp(const Problem& problem, const Slice& zone) {
+std::vector<Slice> partial_dp(const Problem& problem, const Slice& zone) {
     /* scores est une unordered_map avec pour clé un vecteur d'entier v de
      * taille zone.w() représentant un partitionnement, et en valeur le
      * meilleur score possible pour ce partitionnement.
@@ -120,6 +133,7 @@ void partial_dp(const Problem& problem, const Slice& zone) {
      * la première ligne disponible pour la colonne j + zone.j0
      */
     std::unordered_map<std::vector<int>, int, container_hash<std::vector<int>>> scores;
+    std::unordered_map<std::vector<int>, std::pair<Slice, std::vector<int>>, container_hash<std::vector<int>>> moves;
 
     // init
     std::vector<int> position(zone.w(), zone.i0);
@@ -165,9 +179,11 @@ void partial_dp(const Problem& problem, const Slice& zone) {
 
                 if(scores.find(position) == scores.end()) {
                     scores[position] = slice.size();
+                    moves[position] = std::make_pair(slice, std::vector<int>());
                 }
-                else {
-                    scores[position] = std::max(scores[position], slice.size());
+                else if(slice.size() > scores[position]) {
+                    scores[position] = slice.size();
+                    moves[position] = std::make_pair(slice, std::vector<int>());
                 }
 
                 // les autres possibilités
@@ -194,30 +210,41 @@ void partial_dp(const Problem& problem, const Slice& zone) {
 
                         if(scores.find(position) == scores.end()) {
                             scores[position] = item.second + slice.size();
+                            moves[position] = std::make_pair(slice, last_position);
                         }
-                        else {
-                            scores[position] = std::max(scores[position], item.second + slice.size());
+                        else if(item.second + slice.size() > scores[position]) {
+                            scores[position] = item.second + slice.size();
+                            moves[position] = std::make_pair(slice, last_position);
                         }
                     }
                 }
             }
-
-            std::cerr << "(" << i << ", " << j << ") - " << scores.size() << " possibilities" << std::endl;
         }
     }
 
     // recherche du meilleur score
     int best_score = 0;
+    position.clear();
 
     for(const auto& item : scores) {
-        best_score = std::max(best_score, item.second);
+        if(item.second > best_score) {
+            best_score = item.second;
+            position = item.first;
+        }
     }
 
-    std::cerr << "scored " << best_score << std::endl;
+    std::vector<Slice> result;
+    while(moves.find(position) != moves.end()) {
+        const auto& move = moves[position];
+        result.push_back(move.first);
+        position = move.second;
+    }
+
+    return result;
 }
 
 void solution_dp(const Problem& problem) {
-    partial_dp(problem, Slice(0, 11, 0, 7));
+    std::cout << partial_dp(problem, Slice(0, 7, 0, 11));
 }
 
 int main(int argc, char* argv[]) {
