@@ -244,7 +244,51 @@ std::vector<Slice> partial_dp(const Problem& problem, const Slice& zone) {
 }
 
 void solution_dp(const Problem& problem) {
-    std::cout << partial_dp(problem, Slice(0, 7, 0, 11));
+    /*
+    const int square_max_size = 20; // square of size 20 * 20 max
+    std::vector<int> max_size(square_max_size + 1);
+
+    max_size[rows] = cols indique que pour `rows` ligne, on peut faire du partiel dp sur `cols` colonne au maximum
+    max_size[1] = 46;
+    max_size[2] = 29;
+    max_size[3] = 20;
+    max_size[4] = 16;
+    max_size[5] = 15;
+    max_size[6] = 12;
+    max_size[7] = 11;
+    max_size[8] = 11;
+    max_size[9] = 9;
+    max_size[10] = 9;
+    max_size[11] = 8;
+    max_size[12] = 8;
+    max_size[13] = 8;
+    max_size[14] = 8;
+    max_size[15] = 7;
+    max_size[16] = 7;
+    max_size[17] = 7;
+    max_size[18] = 7;
+    max_size[19] = 7;
+    max_size[20] = 6;
+    */
+
+    const int HEIGHT = 5;
+    const int WIDTH = 15;
+
+    std::vector<Slice> result;
+    for(int i = 0; i < problem.rows; i += HEIGHT) {
+        for(int j = 0; j < problem.cols; j += WIDTH) {
+            const Slice slice(i, std::min(i + HEIGHT - 1, problem.rows - 1),
+                              j, std::min(j + WIDTH - 1, problem.cols - 1));
+            const std::vector<Slice> partial_solution = partial_dp(problem, slice);
+            for(const auto& s : partial_solution) {
+                result.push_back(s);
+            }
+
+            std::cerr << "(" << i << ", " << j << ")" << std::endl;
+        }
+    }
+
+    std::cout << result;
 }
 
 int main(int argc, char* argv[]) {
