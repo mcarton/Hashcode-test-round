@@ -111,18 +111,18 @@ int count_ham(const Problem& problem, const Slice& slice) {
     return ham;
 }
 
-void solution_dp(const Problem& problem) {
+void partial_dp(const Problem& problem, const Slice& zone) {
     /* scores est une unordered_map avec pour clé un vecteur d'entier v de
-     * taille problem.cols représentant un partitionnement, et en valeur le
+     * taille zone.w() représentant un partitionnement, et en valeur le
      * meilleur score possible pour ce partitionnement.
      *
      * Pour un vecteur v représentant un partitionnement, v[j] est l'indice de
-     * la première ligne disponible pour la colonne j
+     * la première ligne disponible pour la colonne j + zone.j0
      */
     std::unordered_map<std::vector<int>, int, container_hash<std::vector<int>>> scores;
 
     // init
-    std::vector<int> position(problem.cols, 0);
+    std::vector<int> position(zone.w(), zone.i0);
     scores[position] = 0;
 
     // ensemble des couples (w, h) des parts possibles
@@ -136,14 +136,14 @@ void solution_dp(const Problem& problem) {
     }
 
     // programmation dynamique
-    for(int i = 0; i < problem.rows; ++i) {
-        for(int j = 0; j < problem.cols; ++j) {
+    for(int i = zone.i0; i <= zone.i1; ++i) {
+        for(int j = zone.j0; j <= zone.j1; ++j) {
             // calcul des parts possibles terminant en (i, j)
             std::vector<Slice> slices;
             slices.reserve(all_slices.size());
 
             for(const auto& square : all_slices) {
-                if(j - square.first + 1 >= 0 && i - square.second + 1 >= 0) {
+                if(j - square.first + 1 >= zone.j0 && i - square.second + 1 >= zone.i0) {
                     Slice slice(i - square.second + 1, i, j - square.first + 1, j);
                     if(count_ham(problem, slice) >= problem.h) {
                         slices.push_back(slice);
@@ -153,13 +153,13 @@ void solution_dp(const Problem& problem) {
 
             // pour chaque part finissant en (i, j)
             for(const auto& slice : slices) {
-                // première possibilité : slice tout seul dans la zone de possibilité
-                for(int p = 0; p < problem.cols; ++p) {
-                    if(slice.j0 <= p && p <= slice.j1) {
-                        position[p] = std::min(slice.i1 + 1, problem.rows);
+                // première possibilité : slice tout seul
+                for(int p = 0; p < zone.w(); ++p) {
+                    if(slice.j0 <= zone.j0 + p && zone.j0 + p <= slice.j1) {
+                        position[p] = slice.i1 + 1;
                     }
                     else {
-                        position[p] = std::max(i - problem.s + 1, 0);
+                        position[p] = zone.i0;
                     }
                 }
 
@@ -176,16 +176,16 @@ void solution_dp(const Problem& problem) {
 
                     // peut-on insérer slice dans la position ?
                     bool valid = true;
-                    for(int p = slice.j0; valid && p <= slice.j1; ++p) {
+                    for(int p = slice.j0 - zone.j0; valid && p <= slice.j1 - zone.j0; ++p) {
                         if(slice.i0 < last_position[p]) {
                             valid = false;
                         }
                     }
 
                     if(valid) {
-                        for(int p = 0; p < problem.cols; ++p) {
-                            if(slice.j0 <= p && p <= slice.j1) {
-                                position[p] = std::min(slice.i1 + 1, problem.rows);
+                        for(int p = 0; p < zone.w(); ++p) {
+                            if(slice.j0 <= p + zone.j0 && p + zone.j0 <= slice.j1) {
+                                position[p] = slice.i1 + 1;
                             }
                             else {
                                 position[p] = last_position[p];
@@ -205,6 +205,19 @@ void solution_dp(const Problem& problem) {
             std::cerr << "(" << i << ", " << j << ") - " << scores.size() << " possibilities" << std::endl;
         }
     }
+
+    // recherche du meilleur score
+    int best_score = 0;
+
+    for(const auto& item : scores) {
+        best_score = std::max(best_score, item.second);
+    }
+
+    std::cerr << "scored " << best_score << std::endl;
+}
+
+void solution_dp(const Problem& problem) {
+    partial_dp(problem, Slice(0, 11, 0, 7));
 }
 
 int main(int argc, char* argv[]) {
