@@ -145,7 +145,30 @@ int count_ham(const Problem& problem, const Slice& slice) {
 /* mise en cache des ensemble de couple (w, h) des parts possibles */
 std::vector<std::pair<int, int>> all_slices;
 
-std::vector<Slice> partial_dp(const Problem& problem, const Slice& zone) {
+/* mise en cache des résultats de partial_dp */
+boost::multi_array<std::vector<Slice>, 4> cache_partial_dp;
+
+const std::vector<Slice>& partial_dp(const Problem& problem, const Slice& zone) {
+    // ensemble des couples (w, h) des parts possibles
+    if(all_slices.size() == 0) { // pas encore calculé
+        for(int w = 1; w <= problem.s; ++w) {
+            for(int h = 1; h <= problem.s; ++h) {
+                if(w * h <= problem.s) {
+                    all_slices.emplace_back(w, h);
+                }
+            }
+        }
+    }
+
+    if(cache_partial_dp.size() == 0) {
+        // initialisation du cache
+        cache_partial_dp.resize(extents[problem.rows][problem.cols][problem.rows][problem.cols]);
+    }
+
+    if(cache_partial_dp[zone.i0][zone.j0][zone.i1][zone.j1].size() > 0) {
+        return cache_partial_dp[zone.i0][zone.j0][zone.i1][zone.j1];
+    }
+
     /* scores est une unordered_map avec pour clé un vecteur d'entier v de
      * taille zone.w() représentant un partitionnement, et en valeur le
      * meilleur score possible pour ce partitionnement.
@@ -159,17 +182,6 @@ std::vector<Slice> partial_dp(const Problem& problem, const Slice& zone) {
     // init
     std::vector<int> position(zone.w(), zone.i0);
     scores[position] = 0;
-
-    // ensemble des couples (w, h) des parts possibles
-    if(all_slices.size() == 0) { // pas encore calculé
-        for(int w = 1; w <= problem.s; ++w) {
-            for(int h = 1; h <= problem.s; ++h) {
-                if(w * h <= problem.s) {
-                    all_slices.emplace_back(w, h);
-                }
-            }
-        }
-    }
 
     // programmation dynamique
     for(int i = zone.i0; i <= zone.i1; ++i) {
@@ -263,7 +275,8 @@ std::vector<Slice> partial_dp(const Problem& problem, const Slice& zone) {
         position = move.second;
     }
 
-    return result;
+    cache_partial_dp[zone.i0][zone.j0][zone.i1][zone.j1] = std::move(result);
+    return cache_partial_dp[zone.i0][zone.j0][zone.i1][zone.j1];
 }
 
 // returne true si le slice peut être contenu dans la solution
@@ -354,55 +367,57 @@ int score(const std::vector<Slice>& solution) {
 }
 
 void solution_dp(const Problem& problem) {
-    /*
-    const int square_max_size = 20; // square of size 20 * 20 max
-    std::vector<int> max_size(square_max_size + 1);
+    /* scores[i][j] = meilleur score possible en utilisant les (y, x)
+     *                avec 0 <= y <= i et 0 <= x <= j
+     */
+    boost::multi_array<int, 2> scores(extents[problem.rows][problem.cols]);
 
-    max_size[rows] = cols indique que pour `rows` ligne, on peut faire du partiel dp sur `cols` colonne au maximum
-    max_size[1] = 46;
-    max_size[2] = 29;
-    max_size[3] = 20;
-    max_size[4] = 16;
-    max_size[5] = 15;
-    max_size[6] = 12;
-    max_size[7] = 11;
-    max_size[8] = 11;
-    max_size[9] = 9;
-    max_size[10] = 9;
-    max_size[11] = 8;
-    max_size[12] = 8;
-    max_size[13] = 8;
-    max_size[14] = 8;
-    max_size[15] = 7;
-    max_size[16] = 7;
-    max_size[17] = 7;
-    max_size[18] = 7;
-    max_size[19] = 7;
-    max_size[20] = 6;
-    */
+    const int DP_MAX_WIDTH = 6;
+    const int DP_MAX_HEIGHT = 12;
 
-    const int HEIGHT = 15;
-    const int WIDTH = 6;
+    // programmation dynamique
+    for(int i = 0; i < problem.rows; ++i) {
+        for(int j = 0; j < problem.cols; ++j) {
+            // calcul de scores[i][j]
+            scores[i][j] = 0;
 
-    std::vector<Slice> result;
-    for(int i = 0; i < problem.rows; i += HEIGHT) {
-        for(int j = 0; j < problem.cols; j += WIDTH) {
-            const Slice slice(i, std::min(i + HEIGHT - 1, problem.rows - 1),
-                              j, std::min(j + WIDTH - 1, problem.cols - 1));
-            const std::vector<Slice> partial_solution = partial_dp(problem, slice);
-            for(const auto& s : partial_solution) {
-                result.push_back(s);
+            // on découpe notre espace en deux avec la colonne prev_j
+            for(int prev_j = std::max(0, j - DP_MAX_WIDTH + 1); prev_j <= j; ++prev_j) {
+                // score[i][prev_j - 1] + meilleur score dans [prev_j..j]
+                std::vector<int> scores_bloc(i + 1, 0);
+
+                for(int k = 0; k <= i; ++k) {
+                    // calcul de scores_bloc[k]
+                    scores_bloc[k] = 0;
+
+                    for(int prev_k = std::max(0, k - DP_MAX_HEIGHT + 1); prev_k <= k; ++prev_k) {
+                        const std::vector<Slice>& solution = partial_dp(problem, Slice(prev_k, k, prev_j, j));
+                        int s = score(solution);
+                        if(prev_k > 0) {
+                            s += scores_bloc[prev_k - 1];
+                        }
+                        scores_bloc[k] = std::max(scores_bloc[k], s);
+                    }
+                }
+
+                int s = scores_bloc[i];
+                if(prev_j > 0) {
+                    s += scores[i][prev_j - 1];
+                }
+                scores[i][j] = std::max(scores[i][j], s);
             }
 
-            std::cerr << "(" << i << ", " << j << ")" << std::endl;
+            std::cerr << "(" << i << ", " << j << ") score " << scores[i][j] << std::endl;
         }
     }
 
+    /*
     // dernière optimisation
     optimize_solution(problem, result);
 
     std::cerr << "score " << score(result) << std::endl;
     std::cout << result;
+    */
 }
 
 int main(int argc, char* argv[]) {
