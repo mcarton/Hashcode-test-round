@@ -343,6 +343,16 @@ void optimize_solution(const Problem& problem, std::vector<Slice> solution) {
     }
 }
 
+int score(const std::vector<Slice>& solution) {
+    int s = 0;
+
+    for(const auto& slice : solution) {
+        s += slice.size();
+    }
+
+    return s;
+}
+
 void solution_dp(const Problem& problem) {
     /*
     const int square_max_size = 20; // square of size 20 * 20 max
@@ -391,12 +401,7 @@ void solution_dp(const Problem& problem) {
     // dernière optimisation
     optimize_solution(problem, result);
 
-    int score = 0;
-    for(const auto& s : result) {
-        score += s.size();
-    }
-
-    std::cerr << "score " << score << std::endl;
+    std::cerr << "score " << score(result) << std::endl;
     std::cout << result;
 }
 
