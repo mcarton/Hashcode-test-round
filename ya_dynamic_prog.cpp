@@ -146,7 +146,7 @@ std::vector<std::pair<int, int>> all_slices;
 /* mise en cache des résultats de partial_dp */
 boost::multi_array<std::vector<Slice>, 4> cache_partial_dp;
 
-const std::vector<Slice>& partial_dp(const Problem& problem, const Slice& zone) {
+const std::vector<Slice>& partial_dp(const Problem& problem, const Slice& zone, bool clean_old) {
     // ensemble des couples (w, h) des parts possibles
     if(all_slices.size() == 0) { // pas encore calculé
         for(int w = 1; w <= problem.s; ++w) {
@@ -175,7 +175,7 @@ const std::vector<Slice>& partial_dp(const Problem& problem, const Slice& zone) 
      * la première ligne disponible pour la colonne j + zone.j0
      */
     std::unordered_map<std::vector<int>, int, container_hash<std::vector<int>>> scores;
-    std::unordered_map<std::vector<int>, std::pair<Slice, std::vector<int>>, container_hash<std::vector<int>>> moves;
+    std::unordered_map<std::vector<int>, std::pair<std::vector<Slice>, std::vector<int>>, container_hash<std::vector<int>>> moves;
 
     // init
     std::vector<int> position(zone.w(), zone.i0);
@@ -183,6 +183,98 @@ const std::vector<Slice>& partial_dp(const Problem& problem, const Slice& zone) 
 
     // programmation dynamique
     for(int i = zone.i0; i <= zone.i1; ++i) {
+        /* Ceci est une phase d'optimisation qui supprime les positions au dela
+         * de 12 case vers le haut */
+        if(clean_old && i - zone.i0 + 1 > problem.s) {
+            /* on optimize ici en sauvant des pointeurs vers la position */
+            std::vector<const std::vector<int>*> old_positions;
+
+            // recherche des positions à modifier
+            for(auto& item : scores) {
+                for(int p = 0; p < zone.w(); ++p) {
+                    if(item.first[p] <= i - problem.s) {
+                        old_positions.push_back(&item.first);
+                        break;
+                    }
+                }
+            }
+
+            // on supprime les positions de `scores`
+            for(const auto& old_position_ptr : old_positions) {
+                const std::vector<int>& old_position = *old_position_ptr;
+
+                // calcul de la nouvelle position
+                for(int p = 0; p < zone.w(); ++p) {
+                    position[p] = std::max(old_position[p], i - problem.s + 1);
+                }
+
+                // insertion dans scores
+                if(scores.find(position) == scores.end()
+                        || scores[old_position] > scores[position]) {
+                    scores[position] = scores[old_position];
+                    moves[position] = moves[old_position];
+                }
+
+                scores.erase(old_position);
+            }
+
+            /* pour chaque mouvement que l'on va conserver, si le précédent est
+             * supprimé, on va calculer la solution partielle */
+            for(auto& item : moves) {
+                bool kept = true;
+
+                for(int p = 0; p < zone.w(); ++p) {
+                    if(item.first[p] <= i - problem.s) {
+                        kept = false;
+                        break;
+                    }
+                }
+
+                if(kept) {
+                    std::vector<int> parent = item.second.second;
+                    bool parent_old = false;
+
+                    for(std::size_t p = 0; p < parent.size(); ++p) {
+                        if(parent[p] <= i - problem.s) {
+                            parent_old = true;
+                            break;
+                        }
+                    }
+
+                    if(parent_old) {
+                        while(moves.find(parent) != moves.end()) {
+                            auto& parent_move = moves[parent];
+                            item.second.first.insert(item.second.first.end(),
+                                                     parent_move.first.begin(),
+                                                     parent_move.first.end());
+                            parent = parent_move.second;
+                        }
+
+                        item.second.second = std::vector<int>{}; // plus de parent
+                    }
+                }
+            }
+
+            // on supprime les positions de `moves`
+            for(auto it = moves.begin(); it != moves.end();) {
+                bool old = false;
+
+                for(int p = 0; p < zone.w(); ++p) {
+                    if(it->first[p] <= i - problem.s) {
+                        old = true;
+                        break;
+                    }
+                }
+
+                if(old) {
+                    it = moves.erase(it);
+                }
+                else {
+                    ++it;
+                }
+            }
+        }
+
         for(int j = zone.j0; j <= zone.j1; ++j) {
             // calcul des parts possibles terminant en (i, j)
             std::vector<Slice> slices;
@@ -209,13 +301,10 @@ const std::vector<Slice>& partial_dp(const Problem& problem, const Slice& zone) 
                     }
                 }
 
-                if(scores.find(position) == scores.end()) {
+                if(scores.find(position) == scores.end()
+                        || slice.size() > scores[position]) {
                     scores[position] = slice.size();
-                    moves[position] = std::make_pair(slice, std::vector<int>());
-                }
-                else if(slice.size() > scores[position]) {
-                    scores[position] = slice.size();
-                    moves[position] = std::make_pair(slice, std::vector<int>());
+                    moves[position] = std::make_pair(std::vector<Slice>{slice}, std::vector<int>{});
                 }
 
                 // les autres possibilités
@@ -241,13 +330,10 @@ const std::vector<Slice>& partial_dp(const Problem& problem, const Slice& zone) 
                             }
                         }
 
-                        if(scores.find(position) == scores.end()) {
+                        if(scores.find(position) == scores.end()
+                                || item.second + slice.size() > scores[position]) {
                             scores[position] = item.second + slice.size();
-                            moves[position] = std::make_pair(slice, last_position);
-                        }
-                        else if(item.second + slice.size() > scores[position]) {
-                            scores[position] = item.second + slice.size();
-                            moves[position] = std::make_pair(slice, last_position);
+                            moves[position] = std::make_pair(std::vector<Slice>{slice}, last_position);
                         }
                     }
                 }
@@ -259,17 +345,18 @@ const std::vector<Slice>& partial_dp(const Problem& problem, const Slice& zone) 
     int best_score = 0;
     position.clear();
 
-    for(const auto& item : scores) {
+    for(auto& item : scores) {
         if(item.second > best_score) {
             best_score = item.second;
-            position = item.first;
+            position = std::move(item.first);
         }
     }
 
     std::vector<Slice> result;
     while(moves.find(position) != moves.end()) {
-        const auto& move = moves[position];
-        result.push_back(move.first);
+        auto& move = moves[position];
+        result.insert(result.end(), std::make_move_iterator(move.first.begin()),
+                                    std::make_move_iterator(move.first.end()));
         position = move.second;
     }
 
@@ -396,7 +483,7 @@ void solution_dp(const Problem& problem) {
 
                     for(int prev_k = std::max(0, k - DP_MAX_HEIGHT + 1); prev_k <= k; ++prev_k) {
                         // score = score_bloc[prev_k - 1] + meilleur score dans [prev_k..k]
-                        const std::vector<Slice>& solution = partial_dp(problem, Slice(prev_k, k, prev_j, j));
+                        const std::vector<Slice>& solution = partial_dp(problem, Slice(prev_k, k, prev_j, j), true);
                         int s = score(solution);
                         if(prev_k > 0) {
                             s += scores_bloc[prev_k - 1];
@@ -449,7 +536,7 @@ void solution_dp(const Problem& problem) {
 
                     for(int prev_k = std::max(0, k - DP_MAX_HEIGHT + 1); prev_k <= k; ++prev_k) {
                         // score = score_bloc[prev_k - 1] + meilleur score dans [prev_k..k]
-                        const std::vector<Slice>& solution = partial_dp(problem, Slice(prev_i, i, prev_k, k));
+                        const std::vector<Slice>& solution = partial_dp(problem, Slice(prev_i, i, prev_k, k), true);
                         int s = score(solution);
                         if(prev_k > 0) {
                             s += scores_bloc[prev_k - 1];
