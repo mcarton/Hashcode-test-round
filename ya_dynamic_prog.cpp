@@ -5,9 +5,7 @@
 #include <boost/multi_array.hpp>
 #include <boost/functional/hash.hpp>
 
-using boost::indices;
 using boost::extents;
-typedef boost::multi_array_types::index_range range;
 
 /**
  * Structures
@@ -153,7 +151,7 @@ const std::vector<Slice>& partial_dp(const Problem& problem, const Slice& zone) 
     if(all_slices.size() == 0) { // pas encore calculé
         for(int w = 1; w <= problem.s; ++w) {
             for(int h = 1; h <= problem.s; ++h) {
-                if(w * h <= problem.s) {
+                if(w * h <= problem.s && w * h >= problem.h) {
                     all_slices.emplace_back(w, h);
                 }
             }
